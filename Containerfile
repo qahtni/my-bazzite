@@ -1,8 +1,8 @@
 # =============================================
-# Custom Bazzite KDE image with HDMI FRL kernel
+# Custom Bazzite Deck image with HDMI FRL kernel
 # Uses sneed/kernel-hdmi-frl COPR
 # =============================================
-FROM ghcr.io/ublue-os/bazzite:stable
+FROM ghcr.io/ublue-os/bazzite-deck:stable
 
 # Download the hdmi_frl kernel RPMs from COPR as local files
 RUN curl --fail -fsSL \
@@ -22,7 +22,7 @@ RUN curl --fail -fsSL \
 
 # Replace the stock kernel atomically using local RPM files.
 # Using override replace (not remove+install) so the dep solver sees
-# kernel-modules-extra as swapped not deleted — keeps usbip satisfied.
+# kernel-modules-extra as swapped not deleted - keeps usbip satisfied.
 # --remove handles packages that hard-pin to the stock kernel version.
 RUN rpm-ostree override replace \
     --remove=kernel-common \
