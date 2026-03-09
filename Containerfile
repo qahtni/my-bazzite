@@ -4,8 +4,7 @@
 # =============================================
 FROM ghcr.io/ublue-os/bazzite:stable
 
-# Enable COPR repo and download the kernel RPMs as local files
-# This avoids rpm-ostree depsolve issues with --from repo=
+# Download the hdmi_frl kernel RPMs from COPR as local files
 RUN curl --fail -fsSL \
     https://copr.fedorainfracloud.org/coprs/sneed/kernel-hdmi-frl/repo/fedora-43/sneed-kernel-hdmi-frl-fedora-43.repo \
     -o /etc/yum.repos.d/sneed-kernel-hdmi-frl.repo && \
@@ -19,22 +18,18 @@ RUN curl --fail -fsSL \
         kernel-modules \
         kernel-modules-core \
         kernel-modules-extra && \
-    ls -la /tmp/kernel-rpms/ && \
     rm /etc/yum.repos.d/sneed-kernel-hdmi-frl.repo
 
-# Remove all packages that pin to the stock kernel version,
-# then install the downloaded hdmi_frl kernel RPMs
-RUN rpm-ostree override remove \
-        kernel \
-        kernel-core \
-        kernel-modules \
-        kernel-modules-core \
-        kernel-modules-extra \
-        kernel-common \
-        kernel-devel \
-        kernel-devel-matched \
-        kernel-modules-akmods \
-    && rpm-ostree install /tmp/kernel-rpms/*.rpm \
+# Replace the stock kernel atomically using local RPM files.
+# Using override replace (not remove+install) so the dep solver sees
+# kernel-modules-extra as swapped not deleted — keeps usbip satisfied.
+# --remove handles packages that hard-pin to the stock kernel version.
+RUN rpm-ostree override replace \
+    --remove=kernel-common \
+    --remove=kernel-devel \
+    --remove=kernel-devel-matched \
+    --remove=kernel-modules-akmods \
+    /tmp/kernel-rpms/*x86_64.rpm \
     && rm -rf /tmp/kernel-rpms
 
 # Finalize the ostree layer
