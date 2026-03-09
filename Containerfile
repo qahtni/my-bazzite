@@ -5,9 +5,11 @@
 FROM ghcr.io/ublue-os/bazzite:stable
 
 # Enable the COPR repo that ships pre-built hdmi_frl kernel RPMs for fc43
-RUN curl -fsSL \
+# --fail makes curl exit with error code if the URL doesn't exist
+RUN curl --fail -fsSL \
     https://copr.fedorainfracloud.org/coprs/sneed/kernel-hdmi-frl/repo/fedora-43/sneed-kernel-hdmi-frl-fedora-43.repo \
-    -o /etc/yum.repos.d/sneed-kernel-hdmi-frl.repo
+    -o /etc/yum.repos.d/sneed-kernel-hdmi-frl.repo && \
+    cat /etc/yum.repos.d/sneed-kernel-hdmi-frl.repo
 
 # Remove stock kernel packages and replace with hdmi_frl versions from COPR
 RUN rpm-ostree cliwrap install-to-root / && \
