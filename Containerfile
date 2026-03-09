@@ -10,24 +10,16 @@ RUN curl --fail -fsSL \
     -o /etc/yum.repos.d/sneed-kernel-hdmi-frl.repo && \
     cat /etc/yum.repos.d/sneed-kernel-hdmi-frl.repo
 
-# Remove stock kernel packages and replace with hdmi_frl versions from COPR
-# kernel-devel and kernel-devel-matched must also be removed as they pin to the stock kernel version
-RUN rpm-ostree cliwrap install-to-root / && \
-    rpm-ostree override remove \
-        kernel \
-        kernel-common \
-        kernel-core \
-        kernel-modules \
-        kernel-modules-core \
-        kernel-modules-extra \
-        kernel-modules-akmods \
-        kernel-devel \
-        kernel-devel-matched \
-    --install kernel \
-    --install kernel-core \
-    --install kernel-modules \
-    --install kernel-modules-core \
-    --install kernel-modules-extra && \
+# Replace the stock kernel with the hdmi_frl version from COPR
+# override replace --from repo= swaps packages atomically without needing to name what to remove
+RUN rpm-ostree override replace \
+    --experimental \
+    --from repo=copr:copr.fedorainfracloud.org:sneed:kernel-hdmi-frl \
+    kernel \
+    kernel-core \
+    kernel-modules \
+    kernel-modules-core \
+    kernel-modules-extra && \
     rm /etc/yum.repos.d/sneed-kernel-hdmi-frl.repo
 
 # Finalize the ostree layer
