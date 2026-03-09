@@ -1,40 +1,30 @@
-# Allow build scripts to be referenced without being copied into the final image
-FROM scratch AS ctx
-COPY build_files /
-
-# Base Image
+# =============================================
+# Custom Bazzite KDE image with HDMI FRL kernel
+# Uses sneed/kernel-hdmi-frl COPR (no compilation needed)
+# =============================================
 FROM ghcr.io/ublue-os/bazzite:stable
 
-## Other possible base images include:
-# FROM ghcr.io/ublue-os/bazzite:latest
-# FROM ghcr.io/ublue-os/bluefin-nvidia:stable
-# 
-# ... and so on, here are more base images
-# Universal Blue Images: https://github.com/orgs/ublue-os/packages
-# Fedora base image: quay.io/fedora/fedora-bootc:41
-# CentOS base images: quay.io/centos-bootc/centos-bootc:stream10
+# Enable the COPR repo that ships pre-built hdmi_frl kernel RPMs for fc43
+RUN curl -fsSL \
+    https://copr.fedorainfracloud.org/coprs/sneed/kernel-hdmi-frl/repo/fedora-43/sneed-kernel-hdmi-frl-fedora-43.repo \
+    -o /etc/yum.repos.d/sneed-kernel-hdmi-frl.repo
 
-### [IM]MUTABLE /opt
-## Some bootable images, like Fedora, have /opt symlinked to /var/opt, in order to
-## make it mutable/writable for users. However, some packages write files to this directory,
-## thus its contents might be wiped out when bootc deploys an image, making it troublesome for
-## some packages. Eg, google-chrome, docker-desktop.
-##
-## Uncomment the following line if one desires to make /opt immutable and be able to be used
-## by the package manager.
+# Remove stock kernel packages and replace with hdmi_frl versions from COPR
+RUN rpm-ostree cliwrap install-to-root / && \
+    rpm-ostree override remove \
+        kernel \
+        kernel-common \
+        kernel-core \
+        kernel-modules \
+        kernel-modules-core \
+        kernel-modules-extra \
+        kernel-modules-akmods \
+    --install kernel \
+    --install kernel-core \
+    --install kernel-modules \
+    --install kernel-modules-core \
+    --install kernel-modules-extra && \
+    rm /etc/yum.repos.d/sneed-kernel-hdmi-frl.repo
 
-# RUN rm /opt && mkdir /opt
-
-### MODIFICATIONS
-## make modifications desired in your image and install packages by modifying the build.sh script
-## the following RUN directive does all the things required to run "build.sh" as recommended.
-
-RUN --mount=type=bind,from=ctx,source=/,target=/ctx \
-    --mount=type=cache,dst=/var/cache \
-    --mount=type=cache,dst=/var/log \
-    --mount=type=tmpfs,dst=/tmp \
-    /ctx/build.sh
-    
-### LINTING
-## Verify final image and contents are correct.
-RUN bootc container lint
+# Finalize the ostree layer
+RUN ostree container commit
