@@ -37,28 +37,21 @@ RUN ostree container commit
 
 # =============================================
 # RTL8125 2.5GbE Ethernet stability fix
-# Builds the r8125 driver from Realtek source
-# against the installed kernel headers, installs
-# the .ko, blacklists r8169, and disables EEE.
+# Tunes the r8169 driver (which handles RTL8125
+# on this kernel) to prevent link speed downshifts
+# and disables Energy Efficient Ethernet (EEE)
+# which is the primary cause of random 100Mbps drops.
 # =============================================
 
-# Build and install r8125 driver from source
-RUN dnf install -y kernel-devel make gcc git && \
-    git clone --depth=1 https://github.com/awesometic/realtek-r8125-dkms.git /tmp/r8125 && \
-    KVER=$(ls /lib/modules | tail -1) && \
-    make -C /tmp/r8125/src KERNELDIR=/lib/modules/${KVER}/build && \
-    install -D -m 644 /tmp/r8125/src/r8125.ko \
-        /lib/modules/${KVER}/kernel/drivers/net/ethernet/realtek/r8125.ko && \
-    depmod -a ${KVER} && \
-    rm -rf /tmp/r8125 && \
-    dnf remove -y make gcc git && \
-    dnf clean all
+# Disable ASPM for the r8169 driver and set S5 wakeup
+# aspm=0 prevents PCIe power state transitions that cause
+# the RTL8125 to drop link speed under load or after idle.
+RUN echo "options r8169 aspm=0" > /etc/modprobe.d/r8169-rtl8125.conf
 
-# Blacklist r8169 so r8125 takes over for RTL8125
-RUN echo "blacklist r8169" > /etc/modprobe.d/blacklist-r8169.conf
-
-# Disable Energy Efficient Ethernet on boot via NetworkManager dispatcher
-RUN printf '#!/bin/bash\n[ "$1" = "eno1" ] && [ "$2" = "up" ] && /sbin/ethtool --set-eee eno1 eee off\n' \
+# Disable Energy Efficient Ethernet on every boot via NetworkManager dispatcher.
+# EEE causes the link to renegotiate during idle and can land on 100Mbps.
+RUN mkdir -p /etc/NetworkManager/dispatcher.d && \
+    printf '#!/bin/bash\n[ "$1" = "eno1" ] && [ "$2" = "up" ] && /sbin/ethtool --set-eee "$1" eee off\n' \
     > /etc/NetworkManager/dispatcher.d/99-disable-eee.sh && \
     chmod +x /etc/NetworkManager/dispatcher.d/99-disable-eee.sh
 
