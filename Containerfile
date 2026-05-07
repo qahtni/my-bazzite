@@ -34,3 +34,28 @@ RUN rpm-ostree override replace \
 
 # Finalize the ostree layer
 RUN ostree container commit
+
+# =============================================
+# RTL8125 2.5GbE Ethernet stability fix
+# Installs the official r8125 driver via DKMS,
+# blacklists the generic r8169 driver, and
+# disables EEE to prevent link speed downshifts.
+# =============================================
+
+# Install r8125 DKMS driver from awesometic's package
+RUN curl --fail -fsSL \
+    https://copr.fedorainfracloud.org/coprs/awesometic/realtek-r8125-dkms/repo/fedora-43/awesometic-realtek-r8125-dkms-fedora-43.repo \
+    -o /etc/yum.repos.d/r8125-dkms.repo && \
+    rpm-ostree install r8125-dkms && \
+    rm /etc/yum.repos.d/r8125-dkms.repo
+
+# Blacklist r8169 so r8125 takes over for RTL8125
+RUN echo "blacklist r8169" > /etc/modprobe.d/blacklist-r8169.conf
+
+# Disable Energy Efficient Ethernet on boot via NetworkManager dispatcher
+RUN printf '#!/bin/bash\n[ "$1" = "eno1" ] && [ "$2" = "up" ] && /sbin/ethtool --set-eee eno1 eee off\n' \
+    > /etc/NetworkManager/dispatcher.d/99-disable-eee.sh && \
+    chmod +x /etc/NetworkManager/dispatcher.d/99-disable-eee.sh
+
+# Finalize the ostree layer
+RUN ostree container commit
