@@ -37,17 +37,22 @@ RUN ostree container commit
 
 # =============================================
 # RTL8125 2.5GbE Ethernet stability fix
-# Installs the official r8125 driver via DKMS,
-# blacklists the generic r8169 driver, and
-# disables EEE to prevent link speed downshifts.
+# Builds the r8125 driver from Realtek source
+# against the installed kernel headers, installs
+# the .ko, blacklists r8169, and disables EEE.
 # =============================================
 
-# Install r8125 DKMS driver from awesometic's package
-RUN curl --fail -fsSL \
-    https://copr.fedorainfracloud.org/coprs/awesometic/realtek-r8125-dkms/repo/fedora-43/awesometic-realtek-r8125-dkms-fedora-43.repo \
-    -o /etc/yum.repos.d/r8125-dkms.repo && \
-    rpm-ostree install r8125-dkms && \
-    rm /etc/yum.repos.d/r8125-dkms.repo
+# Build and install r8125 driver from source
+RUN dnf install -y kernel-devel make gcc git && \
+    git clone --depth=1 https://github.com/awesometic/realtek-r8125-dkms.git /tmp/r8125 && \
+    KVER=$(ls /lib/modules | tail -1) && \
+    make -C /tmp/r8125/src KERNELDIR=/lib/modules/${KVER}/build && \
+    install -D -m 644 /tmp/r8125/src/r8125.ko \
+        /lib/modules/${KVER}/kernel/drivers/net/ethernet/realtek/r8125.ko && \
+    depmod -a ${KVER} && \
+    rm -rf /tmp/r8125 && \
+    dnf remove -y make gcc git && \
+    dnf clean all
 
 # Blacklist r8169 so r8125 takes over for RTL8125
 RUN echo "blacklist r8169" > /etc/modprobe.d/blacklist-r8169.conf
